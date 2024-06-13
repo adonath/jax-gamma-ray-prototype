@@ -127,7 +127,7 @@ class Coords:
         return cls(x=x, y=y, energy=energy[:, None, None])
 
 
-@register_dataclass_jax(["amplitude", "index", "energy_0"])
+@register_dataclass_jax(["index", "reference"])
 @dataclasses.dataclass
 class PowerLaw(Model):
     """Power law model for the energy spectrum"""
@@ -294,7 +294,7 @@ class NormModel(Model):
         return (0, 0, 0)
 
 
-@register_dataclass_jax(["model", "exposure", "coords", "psf", "edisp"])
+@register_dataclass_jax(["model", "exposure", "coords_true", "psf", "edisp"])
 @dataclasses.dataclass
 class NPredSourceModel:
     """Npred source model"""
@@ -351,7 +351,7 @@ class NPredSourceModel:
         return npred
 
 
-@register_dataclass_jax(["data"])
+@register_dataclass_jax(["model", "data", "coords"])
 @dataclasses.dataclass(frozen=True)
 class NPredTemplateModel:
     """Data template model"""
@@ -384,7 +384,7 @@ class NPredTemplateModel:
 NPredModel = Union[NPredSourceModel, NPredTemplateModel]
 
 
-@register_dataclass_jax(["models"])
+@register_dataclass_jax(["models"], ["shape"])
 @dataclasses.dataclass(frozen=True)
 class NPredModels:
     """Collection of NPredModels."""
