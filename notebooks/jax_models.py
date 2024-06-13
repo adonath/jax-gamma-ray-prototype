@@ -93,6 +93,11 @@ class Coords:
         """The maximum true energy for each bin."""
         return self.energy[1:]
 
+    @property
+    def energy_log_center(self):
+        """The energy log center"""
+        return jnp.sqrt(self.energy_min * self.energy_max)
+
     @classmethod
     def from_gp_map(cls, gp_map, x_range=None, y_range=None, energy_type="energy_true"):
         """Create from a Gammapy exposure map
@@ -168,7 +173,7 @@ class PowerLaw(Model):
 
     def __call__(self, coords):
         return self.evaluate(
-            coords.energy,
+            coords.energy_log_center,
             self.index.value,
             self.reference.value,
         )
@@ -281,7 +286,7 @@ class NormModel(Model):
     )
 
     def __call__(self, coords):
-        return self.norm.value * self.spectral.call_integrate(coords)
+        return self.norm.value * self.spectral(coords)
 
     @property
     def cutout_slice(self):
