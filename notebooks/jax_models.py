@@ -247,7 +247,7 @@ class FluxModel(Model):
     """Sky model"""
 
     amplitude: Parameter = Parameter.as_default(
-        value=jnp.array(1e-8), unit="TeV^-1 m^-2 s^-1"
+        value=jnp.array(1e-10), unit="TeV^-1 m^-2 s^-1"
     )
     spectral: PowerLaw = PowerLaw.as_default()
     spatial: PointSource = PointSource.as_default()
@@ -273,13 +273,25 @@ class FluxModel(Model):
 @register_dataclass_jax(["norm", "spectral"])
 @dataclasses.dataclass
 class NormModel(Model):
-    """Sky model"""
+    """Norm model"""
 
     norm: Parameter = Parameter.as_default(value=jnp.array(1), unit="")
-    spectral: PowerLaw = PowerLaw.as_default()
+    spectral: PowerLaw = PowerLaw.as_default(
+        index=Parameter(value=jnp.array(0), unit="")
+    )
 
     def __call__(self, coords):
         return self.norm.value * self.spectral.call_integrate(coords)
+
+    @property
+    def cutout_slice(self):
+        """Cutout slice for the spatial model."""
+        return (..., ..., ...)
+
+    @property
+    def offset(self):
+        """Offset for jax dynamic slice"""
+        return (0, 0, 0)
 
 
 @register_dataclass_jax(["model", "exposure", "coords", "psf", "edisp"])
@@ -358,9 +370,7 @@ class NPredTemplateModel:
         """Create from a Gammapy dataset"""
 
         coords = Coords.from_gp_map(
-            dataset.exposure,
-            x_range=model.spatial.x_range,
-            y_range=model.spatial.y_range,
+            dataset.background,
             energy_type="energy",
         )
 
@@ -387,8 +397,10 @@ class NPredModels:
         """Create from a Gammapy dataset"""
         npred_models = []
 
+        get_model_cls = {FluxModel: NPredSourceModel, NormModel: NPredTemplateModel}
+
         for model in models:
-            npred_model = NPredSourceModel.from_gp_dataset(dataset, model)
+            npred_model = get_model_cls[type(model)].from_gp_dataset(dataset, model)
             npred_models.append(npred_model)
 
         shape = dataset.counts.data.shape
@@ -403,9 +415,7 @@ class NPredModels:
 
             offset = npred_model.model.offset
 
-            size = (self.shape[0],) + npred_model.model.spatial.size
-
-            npred_old = lax.dynamic_slice(npred, offset, size)
+            npred_old = lax.dynamic_slice(npred, offset, npred_source.shape)
 
             npred = lax.dynamic_update_slice(npred, npred_source + npred_old, offset)
 
