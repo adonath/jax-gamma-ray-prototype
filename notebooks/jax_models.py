@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Optional
+from enum import Enum
+from typing import Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -55,7 +56,14 @@ class Model:
     pass
 
 
-@register_dataclass_jax(["x", "y", "energy_true"])
+class EnergyType(str, Enum):
+    """Energy type."""
+
+    energy = "energy"
+    energy_true = "energy_true"
+
+
+@register_dataclass_jax(["x", "y", "energy"], ["energy_type"])
 @dataclasses.dataclass(frozen=True)
 class Coords:
     """Coordinate array
@@ -66,37 +74,57 @@ class Coords:
         The x coordinate
     y : jnp.ndarray
         The y coordinate
-    energy_true : jnp.ndarray
-        The true energy coordinate
+    energy : jnp.ndarray
+        The energy coordinate
     """
 
     x: jnp.ndarray
     y: jnp.ndarray
-    energy_true: jnp.ndarray
+    energy: jnp.ndarray
+    energy_type: EnergyType = EnergyType.energy_true
 
     @property
-    def energy_true_min(self):
+    def energy_min(self):
         """The minimum true energy for each bin."""
-        return self.energy_true[:-1]
+        return self.energy[:-1]
 
     @property
-    def energy_true_max(self):
+    def energy_max(self):
         """The maximum true energy for each bin."""
-        return self.energy_true[1:]
+        return self.energy[1:]
 
     @classmethod
-    def from_gp_exposure(cls, exposure, x_range=None, y_range=None):
-        """Create from a Gammapy exposure map"""
-        energy_true = jnp.array(exposure.geom.axes["energy_true"].edges.to_value("TeV"))
+    def from_gp_map(cls, gp_map, x_range=None, y_range=None, energy_type="energy_true"):
+        """Create from a Gammapy exposure map
 
-        x_range = x_range or (0, exposure.data.shape[2])
-        y_range = y_range or (0, exposure.data.shape[1])
+        Parameters
+        ----------
+        gp_map : `Map`
+            Gammapy map
+        x_range : tuple
+            Range of the x coordinate
+        y_range : tuple
+            Range of the y coordinate
+        energy_type : {"energy_true", "energy"}
+            Energy type
+
+        Returns
+        -------
+        coords : `Coords`
+            Coordinate arrays
+        """
+        energy = jnp.array(
+            gp_map.geom.axes[EnergyType(energy_type)].edges.to_value("TeV")
+        )
+
+        x_range = x_range or (0, gp_map.data.shape[2])
+        y_range = y_range or (0, gp_map.data.shape[1])
 
         x, y = jnp.meshgrid(
             jnp.arange(*x_range, dtype=float), jnp.arange(*y_range, dtype=float)
         )
 
-        return cls(x=x, y=y, energy_true=energy_true[:, None, None])
+        return cls(x=x, y=y, energy=energy[:, None, None])
 
 
 @register_dataclass_jax(["amplitude", "index", "energy_0"])
@@ -104,23 +132,20 @@ class Coords:
 class PowerLaw(Model):
     """Power law model for the energy spectrum"""
 
-    amplitude: Parameter = Parameter.as_default(
-        value=jnp.array(1e-8), unit="TeV^-1 m^-2 s^-1"
-    )
     index: Parameter = Parameter.as_default(value=jnp.array(2.0), unit="")
     reference: Parameter = Parameter.as_default(value=jnp.array(1.0), unit="TeV")
 
     @staticmethod
-    def evaluate(energy, amplitude, index, energy_0):
+    def evaluate(energy, index, energy_0):
         """Evaluate the power law model."""
-        return amplitude * (energy / energy_0) ** index
+        return (energy / energy_0) ** index
 
     @staticmethod
-    def integrate(energy_min, energy_max, amplitude, index, reference):
+    def integrate(energy_min, energy_max, index, reference):
         """Integrate the power law model."""
         val = -1 * index + 1
 
-        prefactor = amplitude * reference / val
+        prefactor = reference / val
         upper = jnp.power((energy_max / reference), val)
         lower = jnp.power((energy_min / reference), val)
         integral = prefactor * (upper - lower)
@@ -128,27 +153,30 @@ class PowerLaw(Model):
         mask = jnp.isclose(val * prefactor, 0)
 
         integral = jnp.where(
-            mask, amplitude * reference * jnp.log(energy_max / energy_min), integral
+            mask, reference * jnp.log(energy_max / energy_min), integral
         )
 
         return integral
 
     def call_integrate(self, coords):
         return self.integrate(
-            coords.energy_true_min,
-            coords.energy_true_max,
-            self.amplitude.value,
+            coords.energy_min,
+            coords.energy_max,
             self.index.value,
             self.reference.value,
         )
 
     def __call__(self, coords):
         return self.evaluate(
-            coords.energy_true,
-            self.amplitude.value,
+            coords.energy,
             self.index.value,
             self.reference.value,
         )
+
+    @classmethod
+    def as_default(cls, **kwargs):
+        """Create a default parameter."""
+        return dataclasses.field(default_factory=lambda: cls(**kwargs))
 
 
 @register_dataclass_jax(["x_0", "y_0"])
@@ -207,17 +235,29 @@ class PointSource(Model):
     def __call__(self, coords):
         return self.evaluate(coords.x, coords.y, self.x_0.value, self.y_0.value)
 
+    @classmethod
+    def as_default(cls, **kwargs):
+        """Create a default parameter."""
+        return dataclasses.field(default_factory=lambda: cls(**kwargs))
 
-@register_dataclass_jax(["spectral", "spatial"])
+
+@register_dataclass_jax(["amplitude", "spectral", "spatial"])
 @dataclasses.dataclass
-class SkyModel(Model):
+class FluxModel(Model):
     """Sky model"""
 
-    spectral: PowerLaw
-    spatial: PointSource
+    amplitude: Parameter = Parameter.as_default(
+        value=jnp.array(1e-8), unit="TeV^-1 m^-2 s^-1"
+    )
+    spectral: PowerLaw = PowerLaw.as_default()
+    spatial: PointSource = PointSource.as_default()
 
     def __call__(self, coords):
-        return self.spectral.call_integrate(coords) * self.spatial(coords)
+        return (
+            self.amplitude.value
+            * self.spectral.call_integrate(coords)
+            * self.spatial(coords)
+        )
 
     @property
     def cutout_slice(self):
@@ -230,12 +270,24 @@ class SkyModel(Model):
         return (0,) + self.spatial.offset
 
 
+@register_dataclass_jax(["norm", "spectral"])
+@dataclasses.dataclass
+class NormModel(Model):
+    """Sky model"""
+
+    norm: Parameter = Parameter.as_default(value=jnp.array(1), unit="")
+    spectral: PowerLaw = PowerLaw.as_default()
+
+    def __call__(self, coords):
+        return self.norm.value * self.spectral.call_integrate(coords)
+
+
 @register_dataclass_jax(["model", "exposure", "coords", "psf", "edisp"])
 @dataclasses.dataclass
-class NPredModel:
-    """Data container"""
+class NPredSourceModel:
+    """Npred source model"""
 
-    model: SkyModel
+    model: FluxModel
     exposure: jnp.ndarray
     coords_true: Coords
     psf: Optional[jnp.ndarray] = None
@@ -250,10 +302,11 @@ class NPredModel:
         # TODO: extract at model position
         psf = dataset.psf.get_psf_kernel(geom=dataset.exposure.geom)
 
-        coords_true = Coords.from_gp_exposure(
+        coords_true = Coords.from_gp_map(
             dataset.exposure,
             x_range=model.spatial.x_range,
             y_range=model.spatial.y_range,
+            energy_type="energy_true",
         )
 
         return cls(
@@ -286,6 +339,41 @@ class NPredModel:
         return npred
 
 
+@register_dataclass_jax(["data"])
+@dataclasses.dataclass(frozen=True)
+class NPredTemplateModel:
+    """Data template model"""
+
+    model: NormModel
+    data: jnp.ndarray
+    coords: Coords
+
+    def npred(self):
+        """Compute npred"""
+        correction = self.model(self.coords)
+        return correction * self.data
+
+    @classmethod
+    def from_gp_dataset(cls, dataset, model):
+        """Create from a Gammapy dataset"""
+
+        coords = Coords.from_gp_map(
+            dataset.exposure,
+            x_range=model.spatial.x_range,
+            y_range=model.spatial.y_range,
+            energy_type="energy",
+        )
+
+        return cls(
+            model=model,
+            data=jnp.array(dataset.background.data),
+            coords=coords,
+        )
+
+
+NPredModel = Union[NPredSourceModel, NPredTemplateModel]
+
+
 @register_dataclass_jax(["models"])
 @dataclasses.dataclass(frozen=True)
 class NPredModels:
@@ -300,7 +388,7 @@ class NPredModels:
         npred_models = []
 
         for model in models:
-            npred_model = NPredModel.from_gp_dataset(dataset, model)
+            npred_model = NPredSourceModel.from_gp_dataset(dataset, model)
             npred_models.append(npred_model)
 
         shape = dataset.counts.data.shape
