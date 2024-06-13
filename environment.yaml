@@ -1,0 +1,24 @@
+# Conda environment for Gammapy development
+#
+# Install:    conda env create -f environment-dev.yml
+# Update:     conda env update -f environment-dev.yml
+# Activate:   conda activate gammapy-dev
+# Deactivate: conda deactivate
+
+name: jax-gamma-ray-protoype
+
+channels:
+  - conda-forge
+  - sherpa
+
+variables:
+  PYTHONNOUSERSITE: "1"
+
+dependencies:
+  # core dependencies
+  - python=3.11
+  - gammapy=1.2
+  - matplotlib=3.4
+  - pip:
+    - jax=0.2.26
+    - jaxlib=0.2.26
