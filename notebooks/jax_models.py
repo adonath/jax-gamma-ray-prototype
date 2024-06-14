@@ -63,7 +63,7 @@ class EnergyType(str, Enum):
     energy_true = "energy_true"
 
 
-@register_dataclass_jax(["x", "y", "energy"], ["energy_type"])
+@register_dataclass_jax(meta_fields=["x", "y", "energy", "energy_type"])
 @dataclasses.dataclass(frozen=True)
 class Coords:
     """Coordinate array
@@ -184,7 +184,7 @@ class PowerLaw(Model):
         return dataclasses.field(default_factory=lambda: cls(**kwargs))
 
 
-@register_dataclass_jax(["x_0", "y_0"])
+@register_dataclass_jax(["x_0", "y_0"], ["margin"])
 @dataclasses.dataclass
 class PointSource(Model):
     """Point source model"""
@@ -299,7 +299,7 @@ class NormModel(Model):
         return (0, 0, 0)
 
 
-@register_dataclass_jax(["model", "exposure", "coords_true", "psf", "edisp"])
+@register_dataclass_jax(["model"], ["exposure", "coords_true", "psf", "edisp"])
 @dataclasses.dataclass
 class NPredSourceModel:
     """Npred source model"""
@@ -356,7 +356,7 @@ class NPredSourceModel:
         return npred
 
 
-@register_dataclass_jax(["model", "data", "coords"])
+@register_dataclass_jax(["model"], ["data", "coords"])
 @dataclasses.dataclass(frozen=True)
 class NPredTemplateModel:
     """Data template model"""
