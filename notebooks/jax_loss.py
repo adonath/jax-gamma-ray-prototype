@@ -23,7 +23,6 @@ class CashFitStatistic:
         npred = jnp.maximum(npred, TINY_VALUE)
         return npred - counts * jnp.log(npred)
 
-    @jax.jit
     def __call__(self):
         """Evaluate the Cash fit statistic."""
         npred = self.npred_models.npred()

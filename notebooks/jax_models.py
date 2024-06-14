@@ -9,6 +9,7 @@ from jax.scipy.signal import fftconvolve
 
 FLUX_FACTOR = 1e-6
 
+
 class register_dataclass_jax:
     """Decorator to register a dataclass with JAX."""
 
@@ -262,7 +263,7 @@ class FluxModel(Model):
 
     def __call__(self, coords):
         return (
-            FLUX_FACTOR 
+            FLUX_FACTOR
             * self.amplitude.value
             * self.spectral.call_integrate(coords)
             * self.spatial(coords)
