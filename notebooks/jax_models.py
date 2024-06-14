@@ -7,6 +7,7 @@ import jax.numpy as jnp
 from jax import lax
 from jax.scipy.signal import fftconvolve
 
+FLUX_FACTOR = 1e-6
 
 class register_dataclass_jax:
     """Decorator to register a dataclass with JAX."""
@@ -138,7 +139,9 @@ class PowerLaw(Model):
     """Power law model for the energy spectrum"""
 
     index: Parameter = Parameter.as_default(value=jnp.array(2.0), unit="")
-    reference: Parameter = Parameter.as_default(value=jnp.array(1.0), unit="TeV")
+    reference: Parameter = Parameter.as_default(
+        value=jnp.array(1.0), unit="TeV", frozen=True
+    )
 
     @staticmethod
     def evaluate(energy, index, energy_0):
@@ -191,7 +194,7 @@ class PointSource(Model):
 
     x_0: Parameter = Parameter.as_default(value=jnp.array(0.0), unit="pix")
     y_0: Parameter = Parameter.as_default(value=jnp.array(0.0), unit="pix")
-    margin: int = 50
+    margin: int = 69
 
     @property
     def offset(self):
@@ -252,14 +255,15 @@ class FluxModel(Model):
     """Sky model"""
 
     amplitude: Parameter = Parameter.as_default(
-        value=jnp.array(1e-10), unit="TeV^-1 m^-2 s^-1"
+        value=jnp.array(1e-6), unit="TeV^-1 m^-2 s^-1"
     )
     spectral: PowerLaw = PowerLaw.as_default()
     spatial: PointSource = PointSource.as_default()
 
     def __call__(self, coords):
         return (
-            self.amplitude.value
+            FLUX_FACTOR 
+            * self.amplitude.value
             * self.spectral.call_integrate(coords)
             * self.spatial(coords)
         )
@@ -280,9 +284,9 @@ class FluxModel(Model):
 class NormModel(Model):
     """Norm model"""
 
-    norm: Parameter = Parameter.as_default(value=jnp.array(1), unit="")
+    norm: Parameter = Parameter.as_default(value=jnp.array(1.0), unit="")
     spectral: PowerLaw = PowerLaw.as_default(
-        index=Parameter(value=jnp.array(0), unit="")
+        index=Parameter(value=jnp.array(0.0), unit="")
     )
 
     def __call__(self, coords):
@@ -405,7 +409,7 @@ class NPredModels:
         npred_models = {}
 
         if names is None:
-            names = [f"model-{idx}" for idx in range(len(models))]
+            names = [f"model_{idx}" for idx in range(len(models))]
 
         for name, model in zip(names, models):
             npred_model = NPRED_MODEL_CLS[type(model)].from_gp_dataset(dataset, model)
