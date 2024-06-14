@@ -1,4 +1,4 @@
-name: jax-gamma-ray-prototype
+name: jax-gamma-ray-prototype-gpu
 
 channels:
   - conda-forge
@@ -12,5 +12,5 @@ dependencies:
   - gammapy=1.2
   - ipykernel
   - pip:
-    - jax==0.4.29
+    - jax[cuda12]==0.4.29
     - jaxlib==0.4.29
