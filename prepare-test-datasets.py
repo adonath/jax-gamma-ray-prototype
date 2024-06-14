@@ -23,6 +23,7 @@ GEOM_SPEC = {
     "skydir": SkyCoord("0d", "0d", frame="galactic"),
     "width": "10 deg",
     "binsz": "0.01d",
+    "frame": "galactic",
 }
 
 OBSERVATION_SPEC = {
