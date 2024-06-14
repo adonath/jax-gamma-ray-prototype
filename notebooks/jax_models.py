@@ -388,25 +388,28 @@ class NPredTemplateModel:
 
 NPredModel = Union[NPredSourceModel, NPredTemplateModel]
 
+NPRED_MODEL_CLS = {FluxModel: NPredSourceModel, NormModel: NPredTemplateModel}
+
 
 @register_dataclass_jax(["models"], ["shape"])
 @dataclasses.dataclass(frozen=True)
 class NPredModels:
     """Collection of NPredModels."""
 
-    models: list[NPredModel]
+    models: dict[str, NPredModel]
     shape: tuple[int, int, int]
 
     @classmethod
-    def from_gp_dataset(cls, dataset, models):
+    def from_gp_dataset(cls, dataset, models, names=None):
         """Create from a Gammapy dataset"""
-        npred_models = []
+        npred_models = {}
 
-        get_model_cls = {FluxModel: NPredSourceModel, NormModel: NPredTemplateModel}
+        if names is None:
+            names = [f"model-{idx}" for idx in range(len(models))]
 
-        for model in models:
-            npred_model = get_model_cls[type(model)].from_gp_dataset(dataset, model)
-            npred_models.append(npred_model)
+        for name, model in zip(names, models):
+            npred_model = NPRED_MODEL_CLS[type(model)].from_gp_dataset(dataset, model)
+            npred_models[name] = npred_model
 
         shape = dataset.counts.data.shape
         return cls(models=npred_models, shape=shape)
@@ -415,7 +418,7 @@ class NPredModels:
         """Compute npred"""
         npred = jnp.zeros(self.shape)
 
-        for npred_model in self.models:
+        for _, npred_model in self.models.items():
             npred_source = npred_model.npred()
 
             offset = npred_model.model.offset
