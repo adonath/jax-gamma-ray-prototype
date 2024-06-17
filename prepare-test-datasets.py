@@ -21,7 +21,7 @@ PATH_CALDB = Path("$GAMMAPY_DATA/cta-caldb")
 
 GEOM_SPEC = {
     "skydir": SkyCoord("0d", "0d", frame="galactic"),
-    "width": "10 deg",
+    "width": "10.24 deg",
     "binsz": "0.01d",
     "frame": "galactic",
 }
@@ -31,8 +31,6 @@ OBSERVATION_SPEC = {
     "pointing": SkyCoord("0d", "0d", frame="galactic"),
     "filename_irf": "Prod5-South-20deg-AverageAz-14MSTs37SSTs.180000s-v0.1.fits.gz",
 }
-
-n_obs = 1
 
 
 def get_observation(livetime, pointing, filename_irf, obs_id=1):
@@ -80,10 +78,9 @@ def get_dataset(spec, observation):
 if __name__ == "__main__":
     spec = get_dataset_spec()
 
-    for idx in range(n_obs):
-        observation = get_observation(**OBSERVATION_SPEC, obs_id=idx)
-        dataset = get_dataset(spec, observation)
+    observation = get_observation(**OBSERVATION_SPEC, obs_id=1)
+    dataset = get_dataset(spec, observation)
 
-        filename = Path(f"data/test-dataset-{idx}.fits")
-        log.info(f"Writing {filename}")
-        dataset.write(filename, overwrite=True)
+    filename = Path("data/test-dataset.fits")
+    log.info(f"Writing {filename}")
+    dataset.write(filename, overwrite=True)
