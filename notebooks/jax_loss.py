@@ -38,3 +38,15 @@ class CashFitStatistic:
             npred_models=npred_models,
             mask=jnp.array(dataset.mask_safe.data, dtype=float),
         )
+
+
+@register_dataclass_jax(["fit_statistics"])
+@dataclasses.dataclass
+class FitStatistics:
+    """List of fit statistics"""
+
+    fit_statistics: dict[str, CashFitStatistic]
+
+    def __call__(self):
+        """Evaluate the fit statistics."""
+        return jnp.array([stat() for stat in self.fit_statistics.values()]).sum()

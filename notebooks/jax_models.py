@@ -49,7 +49,13 @@ class Parameter:
     @classmethod
     def as_default(cls, **kwargs):
         """Create a default parameter."""
-        return dataclasses.field(default_factory=lambda: cls(**kwargs))
+
+        def init():
+            init_kwargs = kwargs.copy()
+            kwargs["value"] = jnp.array(kwargs["value"])
+            return cls(**init_kwargs)
+
+        return dataclasses.field(default_factory=init)
 
 
 class Model:
@@ -139,10 +145,8 @@ class Coords:
 class PowerLaw(Model):
     """Power law model for the energy spectrum"""
 
-    index: Parameter = Parameter.as_default(value=jnp.array(2.0), unit="")
-    reference: Parameter = Parameter.as_default(
-        value=jnp.array(1.0), unit="TeV", frozen=True
-    )
+    index: Parameter = Parameter.as_default(value=2.0, unit="")
+    reference: Parameter = Parameter.as_default(value=1.0, unit="TeV", frozen=True)
 
     @staticmethod
     def evaluate(energy, index, energy_0):
@@ -193,8 +197,8 @@ class PowerLaw(Model):
 class PointSource(Model):
     """Point source model"""
 
-    x_0: Parameter = Parameter.as_default(value=jnp.array(0.0), unit="pix")
-    y_0: Parameter = Parameter.as_default(value=jnp.array(0.0), unit="pix")
+    x_0: Parameter = Parameter.as_default(value=0.0, unit="pix")
+    y_0: Parameter = Parameter.as_default(value=0.0, unit="pix")
     margin: int = 69
 
     @property
@@ -255,9 +259,7 @@ class PointSource(Model):
 class FluxModel(Model):
     """Sky model"""
 
-    amplitude: Parameter = Parameter.as_default(
-        value=jnp.array(1e-6), unit="TeV^-1 m^-2 s^-1"
-    )
+    amplitude: Parameter = Parameter.as_default(value=1e-6, unit="TeV^-1 m^-2 s^-1")
     spectral: PowerLaw = PowerLaw.as_default()
     spatial: PointSource = PointSource.as_default()
 
@@ -285,10 +287,8 @@ class FluxModel(Model):
 class NormModel(Model):
     """Norm model"""
 
-    norm: Parameter = Parameter.as_default(value=jnp.array(1.0), unit="")
-    spectral: PowerLaw = PowerLaw.as_default(
-        index=Parameter(value=jnp.array(0.0), unit="")
-    )
+    norm: Parameter = Parameter.as_default(value=1.0, unit="")
+    spectral: PowerLaw = PowerLaw.as_default()
 
     def __call__(self, coords):
         return self.norm.value * self.spectral(coords)
