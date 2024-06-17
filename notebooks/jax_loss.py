@@ -77,6 +77,21 @@ class CashFitStatistic:
 
 @register_dataclass_jax(["fit_statistics"])
 @dataclasses.dataclass
+class WStatFitStatistics:
+    """On off fit statistics"""
+
+    counts: jnp.array
+    npred_models: NPredModels
+    alpha: jnp.array
+    weights: Optional[jnp.array] = None
+
+    @staticmethod
+    def evaluate():
+        pass
+
+
+@register_dataclass_jax(["fit_statistics"])
+@dataclasses.dataclass
 class FitStatistics:
     """List of fit statistics
 
