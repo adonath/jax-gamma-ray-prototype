@@ -1,6 +1,14 @@
 # Gamma-ray data analysis with Jax Prototype
 
-This repo contains a prototype of a gamma-ray data analysis framework using Jax. The main goal is to asses the feasibility of using Jax as a backend to the (Gammapy)[https://gammapy.org/] libraray. It contains a set of benchmarks and tests to compare the performance of Jax with respect to the standard Gammapy analysis, which is based on Numpy and Scipy.
+This repo contains a prototype of a gamma-ray data analysis framework using Jax. The main goal is to asses the feasibility of using Jax as a backend to the (Gammapy)[https://gammapy.org/] library. It contains a set of benchmarks and tests to compare the performance of Jax with respect to the standard Gammapy analysis, which is based on Numpy and Scipy.
+
+We would like to understand how performance scales with:
+
+- The size of the dataset
+- The complexity of the model (number of sources)
+- Use of hardware accelerators (GPU, TPU)
+- Homogeneous vs heterogeneous datasets
+
 
 ## Setup 
 
