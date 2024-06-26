@@ -7,6 +7,7 @@ We would like to understand how performance scales with:
 - The size of the dataset
 - The complexity of the model (number of sources)
 - Use of hardware accelerators (GPU, TPU)
+- Use of gradients of the likelihood function
 - Homogeneous vs heterogeneous datasets
 
 
