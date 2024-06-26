@@ -7,7 +7,7 @@ from jax_models import NPredModels, register_dataclass_jax
 TINY_VALUE = 1e-25
 
 
-@register_dataclass_jax(["npred_models"], ["counts", "mask"])
+@register_dataclass_jax(["npred_models"], ["counts", "weights"])
 @dataclasses.dataclass
 class CashFitStatistic:
     """Cash fit statistic for a set of observed counts and NPredModels.
