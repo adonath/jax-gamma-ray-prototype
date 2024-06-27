@@ -19,6 +19,8 @@ log = logging.getLogger(__name__)
 
 PATH_CALDB = Path("$GAMMAPY_DATA/cta-caldb")
 
+PATH = Path(__file__).parent
+
 GEOM_SPEC = {
     "skydir": SkyCoord("0d", "0d", frame="galactic"),
     "width": "10.24 deg",
@@ -81,6 +83,7 @@ if __name__ == "__main__":
     observation = get_observation(**OBSERVATION_SPEC, obs_id=1)
     dataset = get_dataset(spec, observation)
 
-    filename = Path("data/test-dataset.fits")
+    path = PATH / "../data"
+    filename = path / "test-dataset.fits"
     log.info(f"Writing {filename}")
     dataset.write(filename, overwrite=True)
