@@ -11,6 +11,7 @@ dependencies:
   - python=3.11
   - gammapy=1.2
   - ipykernel
+  - pandas
   - pip:
     - jax==0.4.29
     - jaxlib==0.4.29
