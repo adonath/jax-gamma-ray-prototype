@@ -1,4 +1,6 @@
+import logging
 import timeit
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -13,12 +15,22 @@ from gammapy.modeling.models import (
     PowerLawSpectralModel,
 )
 from gammapy.modeling.models import SkyModel as GPSkyModel
-from jax_models import FLUX_FACTOR, FluxModel, NormModel, PointSource, PowerLaw
-
-from notebooks.jax_models import NPredModels
+from jax_models import (
+    FLUX_FACTOR,
+    FluxModel,
+    NormModel,
+    NPredModels,
+    PointSource,
+    PowerLaw,
+)
 
 jax.config.update("jax_enable_x64", True)
 
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
+
+
+PATH = Path(__file__).parent
 
 RANDOM_STATE = np.random.RandomState(982374)
 
@@ -41,10 +53,10 @@ def get_gp_model(dataset, n_sources=1):
     shape = dataset.counts.data.shape
 
     positions = RANDOM_STATE.uniform(MARGIN, shape[0] - MARGIN, size=(n_sources, 2))
-    positions = dataset.counts.geom.pix_to_coord(positions)
+    positions = dataset.counts.geom.pix_to_coord((positions[:, 0], positions[:, 1]))
 
     for idx in range(n_sources):
-        x_0, y_0 = positions[idx]
+        x_0, y_0 = positions[0][idx], positions[1][idx]
         point = PointSpatialModel(x_0=x_0 * u.deg, y_0=y_0 * u.deg, frame="galactic")
         spectral = PowerLawSpectralModel(amplitude="1e-10 cm-2 s-1 TeV-1")
 
@@ -64,9 +76,6 @@ def get_jax_model(dataset, n_sources=1):
 
     models.append(bkg_jax)
 
-    models.append(FluxModel())
-    models.append(NormModel())
-
     shape = dataset.counts.data.shape
 
     positions = RANDOM_STATE.uniform(MARGIN, shape[0] - MARGIN, size=(n_sources, 2))
@@ -85,11 +94,11 @@ def get_jax_model(dataset, n_sources=1):
 
 
 def profile_n_sources_jax(dataset, use_jit=False):
-
+    log.info(f"Profiling JAX models, using jit: {use_jit}")
     results = []
 
     for n_sources in N_SOURCES:
-
+        log.info(f"Profiling JAX model with n_sources: {n_sources}")
         npred_model_jax = NPredModels.from_gp_dataset(
             dataset, get_jax_model(dataset, n_sources=n_sources)
         )
@@ -100,19 +109,21 @@ def profile_n_sources_jax(dataset, use_jit=False):
             func = jax.jit(func)
 
         result = profile_func(func)
-        results.append((n_sources, result))
+        results.append(result)
 
     return results
 
 
 def profile_n_sources_gp(dataset):
+    log.info("Profiling GP models")
     results = []
 
     for n_sources in N_SOURCES:
-
+        log.info(f"Profiling GP model with n_sources: {n_sources}")
         dataset.models = get_gp_model(dataset, n_sources=n_sources)
+
         result = profile_func(dataset.npred)
-        results.append((n_sources, result))
+        results.append(result)
 
     return results
 
@@ -134,6 +145,11 @@ def profile_dataset_sizes(func, n_sources=1):
 
 
 if __name__ == "__main__":
-    dataset = MapDataset.read("../data/test-dataset-0.fits")
+    dataset = MapDataset.read(PATH / "../data/test-dataset-0.fits")
     result = profile_n_sources(dataset)
-    result.to_csv("results/n_sources.csv", index=False)
+
+    path = PATH / "../results"
+    path.mkdir(exist_ok=True)
+    filename = path / "performance-n-sources.csv"
+    log.info(f"Writing results to {filename}")
+    result.to_csv(filename, index=False)
